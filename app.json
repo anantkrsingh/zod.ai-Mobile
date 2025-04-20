@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "zod-pdf",
-    "slug": "zod-pdf",
+    "name": "zod",
+    "slug": "zod",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -16,7 +16,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anantkrsingh.zodpdf"
+      "package": "com.anantsharma.zod"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +37,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7bae9fe7-6887-411d-b00b-862c01695f7a"
+      }
     }
   }
 }

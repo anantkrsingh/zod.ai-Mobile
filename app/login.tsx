@@ -1,16 +1,30 @@
-import { View, Text, TouchableOpacity, TextInput, Platform, StatusBar, Animated, Easing } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  TextInput,
+  Platform,
+  StatusBar,
+  Animated,
+  Easing,
+  ActivityIndicator,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { useState, useRef, useEffect } from "react";
 import { router } from "expo-router";
+import { loginGoogle } from "@/utils/auth";
+import AuthService from "@/services/AuthService";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Animation values
   const cardRotation = useRef(new Animated.Value(0)).current;
   const cardScale = useRef(new Animated.Value(0.8)).current;
   const formOpacity = useRef(new Animated.Value(0)).current;
@@ -19,7 +33,13 @@ export default function LoginScreen() {
   const inputFocus = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Initial animations with staggered timing
+    GoogleSignin.configure({
+      webClientId:
+        "670526577063-lt72on2ejdi12ffkrq4cjorc4bskc9jg.apps.googleusercontent.com",
+    });
+  }, []);
+
+  useEffect(() => {
     Animated.stagger(200, [
       Animated.parallel([
         Animated.spring(cardRotation, {
@@ -52,8 +72,7 @@ export default function LoginScreen() {
     ]).start();
   }, []);
 
-  const handleGoogleLogin = () => {
-    // Button press animation with spring
+  const handleGoogleLogin = async () => {
     Animated.sequence([
       Animated.spring(buttonScale, {
         toValue: 0.95,
@@ -68,10 +87,21 @@ export default function LoginScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    try {
+      setError("");
+      setIsLoading(true);
+      await loginGoogle();
+      router.replace("/home");
+    } catch (error: any) {
+      setError(error.message || "Failed to login with Google");
+      console.log(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleEmailLogin = () => {
-    // Button press animation with spring
+  const handleEmailLogin = async (isLogin: boolean) => {
     Animated.sequence([
       Animated.spring(buttonScale, {
         toValue: 0.95,
@@ -85,14 +115,29 @@ export default function LoginScreen() {
         tension: 40,
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      console.log("Email login");
-      router.replace("/home");
-    });
+    ]).start(async () => {});
+    try {
+      setError("");
+      setIsLoading(true);
+      if (isLogin) {
+        await AuthService.login({ email, password });
+        console.log("Login successful");
+        router.replace("/home");
+      } else {
+        await AuthService.signup({ email, password, name });
+        console.log("Signup successful");
+        router.replace("/home");
+      }
+    } catch (error: any) {
+      setError(error.message || "Failed to login");
+      console.log(error.message);
+      setIsLoading(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleToggleMode = () => {
-    // Form transition animation with spring
     Animated.sequence([
       Animated.parallel([
         Animated.timing(formOpacity, {
@@ -146,7 +191,7 @@ export default function LoginScreen() {
 
   const cardRotationInterpolate = cardRotation.interpolate({
     inputRange: [0, 1],
-    outputRange: ['-20deg', '0deg'],
+    outputRange: ["-20deg", "0deg"],
   });
 
   const inputScale = inputFocus.interpolate({
@@ -157,14 +202,21 @@ export default function LoginScreen() {
   return (
     <View className="flex-1 bg-gray-100">
       <StatusBar barStyle="dark-content" />
-      {/* Top half with card stack */}
-      <View className="flex-1 justify-center items-center" style={{ marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }}>
-        <Animated.View className="relative" style={{
-          transform: [
-            { rotate: cardRotationInterpolate },
-            { scale: cardScale }
-          ],
-        }}>
+      <View
+        className="flex-1 justify-center items-center"
+        style={{
+          marginTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+        }}
+      >
+        <Animated.View
+          className="relative"
+          style={{
+            transform: [
+              { rotate: cardRotationInterpolate },
+              { scale: cardScale },
+            ],
+          }}
+        >
           <View
             className="rounded-3xl shadow-2xl overflow-hidden bg-white absolute"
             style={{
@@ -209,8 +261,7 @@ export default function LoginScreen() {
         </Animated.View>
       </View>
 
-      {/* Bottom half with login options */}
-      <Animated.View 
+      <Animated.View
         className="min-h-[50%] bg-black rounded-t-[40px] p-6"
         style={{
           opacity: formOpacity,
@@ -221,7 +272,12 @@ export default function LoginScreen() {
           {isLogin ? "Welcome Back" : "Create Account"}
         </Text>
 
-        {/* Email and Password Inputs */}
+        {error ? (
+          <View className="bg-red-500/20 p-3 rounded-lg mb-4">
+            <Text className="text-red-400 text-center">{error}</Text>
+          </View>
+        ) : null}
+
         <View className="space-y-4 mb-6 gap-4">
           {!isLogin && (
             <Animated.View
@@ -271,47 +327,49 @@ export default function LoginScreen() {
           </Animated.View>
         </View>
 
-        {/* Forgot Password Link */}
         {isLogin && (
           <TouchableOpacity
             className="mb-4"
             onPress={() => router.push("/forgot-password")}
           >
-            <Text className="text-gray-400 text-right">
-              Forgot Password?
-            </Text>
+            <Text className="text-gray-400 text-right">Forgot Password?</Text>
           </TouchableOpacity>
         )}
 
-        {/* Login/Signup Button */}
         <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
           <TouchableOpacity
             className="bg-white rounded-xl h-14 mb-4 justify-center"
-            onPress={handleEmailLogin}
+            onPress={() => handleEmailLogin(isLogin)}
           >
             <Text className="text-black text-center font-semibold text-lg">
-              {isLogin ? "Login" : "Sign Up"}
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : isLogin ? (
+                "Login"
+              ) : (
+                "Sign Up"
+              )}
             </Text>
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Google Login Button */}
         <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
           <TouchableOpacity
             className="bg-gray-800 rounded-xl h-14 flex-row items-center justify-center"
             onPress={handleGoogleLogin}
           >
-            <Text className="text-white text-center font-semibold text-lg ml-2">
-              Continue with Google
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text className="text-white text-center font-semibold text-lg ml-2">
+                Continue with Google
+              </Text>
+            )}
           </TouchableOpacity>
         </Animated.View>
 
         {/* Toggle between Login and Signup */}
-        <TouchableOpacity
-          className="mt-4 mb-4"
-          onPress={handleToggleMode}
-        >
+        <TouchableOpacity className="mt-4 mb-4" onPress={handleToggleMode}>
           <Text className="text-gray-400 text-center">
             {isLogin
               ? "Don't have an account? Sign Up"
@@ -321,4 +379,4 @@ export default function LoginScreen() {
       </Animated.View>
     </View>
   );
-} 
+}
