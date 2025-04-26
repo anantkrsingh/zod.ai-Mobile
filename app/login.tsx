@@ -201,7 +201,7 @@ export default function LoginScreen() {
 
   return (
     <View className="flex-1 bg-gray-100">
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
       <View
         className="flex-1 justify-center items-center"
         style={{
@@ -262,7 +262,7 @@ export default function LoginScreen() {
       </View>
 
       <Animated.View
-        className="min-h-[50%] bg-black rounded-t-[40px] p-6"
+        className="min-h-[60%] bg-black rounded-t-[40px] p-6"
         style={{
           opacity: formOpacity,
           transform: [{ translateY: formTranslateY }],
