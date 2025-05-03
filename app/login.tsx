@@ -16,6 +16,7 @@ import { router } from "expo-router";
 import { loginGoogle } from "@/utils/auth";
 import AuthService from "@/services/AuthService";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import NotificationService from "@/services/NotificationService";
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -92,6 +93,7 @@ export default function LoginScreen() {
       setError("");
       setIsLoading(true);
       await loginGoogle();
+      await NotificationService.setupPushNotifications();
       router.replace("/home");
     } catch (error: any) {
       setError(error.message || "Failed to login with Google");
@@ -121,10 +123,12 @@ export default function LoginScreen() {
       setIsLoading(true);
       if (isLogin) {
         await AuthService.login({ email, password });
+        await NotificationService.setupPushNotifications();
         console.log("Login successful");
         router.replace("/home");
       } else {
         await AuthService.signup({ email, password, name });
+        await NotificationService.setupPushNotifications();
         console.log("Signup successful");
         router.replace("/home");
       }

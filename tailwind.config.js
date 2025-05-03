@@ -7,7 +7,14 @@ module.exports = {
   ],
   presets: [require("nativewind/preset")],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'premium-gradient': {
+          start: '#FFD700', // Shining yellow
+          end: '#FFA500',   // Darker yellow/orange
+        },
+      },
+    },
   },
   plugins: [],
 };

@@ -9,12 +9,12 @@ import {
   Keyboard,
   Platform,
 } from "react-native";
-import { useState, useEffect } from "react";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import ShimmerPlaceHolder from "react-native-shimmer-placeholder";
 import LinearGradient from "react-native-linear-gradient";
+import { GradientButton } from "@/components/GradientButton";
 import { generateImage } from "@/services/ImageService";
-import Voice from '@react-native-voice/voice';
 
 export default function GenerateScreen() {
   const [prompt, setPrompt] = useState("");
@@ -23,8 +23,8 @@ export default function GenerateScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showOptions, setShowOptions] = useState(false);
   const [selectedStyle, setSelectedStyle] = useState<string>("cartoon");
-  const [isRecording, setIsRecording] = useState(false);
-  const [isVoiceAvailable, setIsVoiceAvailable] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<"free" | "premium">("free");
+  const [premiumTokens, setPremiumTokens] = useState(1);
 
   const styles = [
     { id: "cartoon", name: "Cartoon" },
@@ -32,41 +32,6 @@ export default function GenerateScreen() {
     { id: "sketch", name: "Sketch" },
     { id: "3d-cartoon", name: "3D Cartoon" },
   ];
-
-  useEffect(() => {
-    const initVoice = async () => {
-      try {
-        await Voice.isAvailable();
-        setIsVoiceAvailable(true);
-      } catch (e) {
-        console.error('Voice recognition not available:', e);
-        setIsVoiceAvailable(false);
-      }
-    };
-
-    initVoice();
-
-    Voice.onSpeechStart = () => {
-      setIsRecording(true);
-    };
-    Voice.onSpeechEnd = () => {
-      setIsRecording(false);
-    };
-    Voice.onSpeechError = (error) => {
-      console.error('Speech recognition error:', error);
-      setError('Failed to recognize speech. Please try again.');
-      setIsRecording(false);
-    };
-    Voice.onSpeechResults = (results: { value?: string[] }) => {
-      if (results.value && results.value.length > 0) {
-        setPrompt(prev => prev + ' ' + results.value[0]);
-      }
-    };
-
-    return () => {
-      Voice.destroy().then(Voice.removeAllListeners);
-    };
-  }, []);
 
   const handleGenerateImage = async () => {
     Keyboard.dismiss();
@@ -76,7 +41,7 @@ export default function GenerateScreen() {
     setError(null);
 
     try {
-      const imageUrl = await generateImage(prompt.trim());
+      const imageUrl = await generateImage(prompt.trim(), selectedStyle,selectedTier);
       setGeneratedImage(imageUrl);
       setPrompt("");
     } catch (err) {
@@ -90,26 +55,6 @@ export default function GenerateScreen() {
   const handleRetry = () => {
     if (prompt.trim()) {
       handleGenerateImage();
-    }
-  };
-
-  const handleVoiceInput = async () => {
-    try {
-      if (isRecording) {
-        await Voice.stop();
-        return;
-      }
-
-      if (!isVoiceAvailable) {
-        setError('Voice recognition is not available on this device');
-        return;
-      }
-
-      await Voice.start('en-US');
-    } catch (error) {
-      console.error('Speech recognition error:', error);
-      setError('Failed to start speech recognition. Please try again.');
-      setIsRecording(false);
     }
   };
 
@@ -180,16 +125,18 @@ export default function GenerateScreen() {
           multiline
         />
         <View className="flex flex-row items-center justify-between w-full">
-          <View>
-            <TouchableOpacity 
+          <View className="flex flex-row items-center justify-between">
+            <TouchableOpacity
               onPress={() => setShowOptions(!showOptions)}
               className="w-10 h-10 bg-white/10 rounded-full items-center justify-center mx-2"
             >
               <Ionicons name="options-outline" size={20} color="white" />
             </TouchableOpacity>
             {showOptions && (
-              <View className="absolute bottom-0 left-0 bg-[#1E1E1E] rounded-2xl p-3 w-40 shadow-lg border border-white/10">
-                <Text className="text-white text-sm font-semibold mb-2">Style Options</Text>
+              <View className="absolute bottom-0 z-10 left-0 bg-[#1E1E1E] rounded-2xl p-3 w-40 shadow-lg border border-white/10">
+                <Text className="text-white text-sm font-semibold mb-2">
+                  Style Options
+                </Text>
                 {styles.map((style) => (
                   <TouchableOpacity
                     key={style.id}
@@ -204,7 +151,9 @@ export default function GenerateScreen() {
                     <View className="flex-row items-center">
                       <Text
                         className={`text-sm flex-1 ${
-                          selectedStyle === style.id ? "text-black" : "text-white"
+                          selectedStyle === style.id
+                            ? "text-black"
+                            : "text-white"
                         }`}
                       >
                         {style.name}
@@ -217,22 +166,37 @@ export default function GenerateScreen() {
                 ))}
               </View>
             )}
+            <View className="flex-row justify-center items-center">
+              <TouchableOpacity
+                onPress={() => setSelectedTier("free")}
+                className={`mr-1 py-0.5 px-2 rounded-full items-center ${
+                  selectedTier === "free" ? "bg-white" : "bg-white/10"
+                }`}
+              >
+                <Text
+                  className={`text-xs font-bold ${
+                    selectedTier === "free" ? "text-black" : "text-white"
+                  }`}
+                >
+                  Free
+                </Text>
+              </TouchableOpacity>
+              <GradientButton
+                text="Premium"
+                onPress={() => setSelectedTier("premium")}
+                isSelected={selectedTier === "premium"}
+                className="ml-1"
+                showTooltip={premiumTokens === 0}
+                tooltipMessage="No premium tokens available. Please purchase more tokens to use premium features."
+                tooltipButtonName="Purchase"
+                onTooltipButtonPress={() => {
+                  // Handle purchase action
+                  console.log("Purchase clicked");
+                }}
+              />
+            </View>
           </View>
           <View className="flex-row">
-            <TouchableOpacity
-              disabled={loadingImage || !isVoiceAvailable}
-              onPress={handleVoiceInput}
-              className={`w-10 h-10 rounded-full items-center justify-center mx-2 ${
-                isRecording ? "bg-red-500" : "bg-white/10"
-              }`}
-            >
-              <MaterialCommunityIcons
-                name="microphone"
-                size={20}
-                color={isRecording ? "white" : "white"}
-              />
-            </TouchableOpacity>
-
             <TouchableOpacity
               disabled={loadingImage}
               onPress={handleGenerateImage}
@@ -247,4 +211,4 @@ export default function GenerateScreen() {
       </View>
     </View>
   );
-} 
+}

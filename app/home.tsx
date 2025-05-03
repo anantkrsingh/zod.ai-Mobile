@@ -41,12 +41,10 @@ export default function HomeScreen() {
     <View className="flex-1 bg-black">
       <StatusBar backgroundColor={"black"} barStyle={"light-content"} />
       
-      {/* Main Content */}
       <View className="flex-1">
         {renderContent()}
       </View>
 
-      {/* Bottom Navigation */}
       <View className="bg-[#1E1E1E] border-t border-white/10">
         <View className="flex-row justify-around items-center py-3">
           {tabs.map((tab) => (

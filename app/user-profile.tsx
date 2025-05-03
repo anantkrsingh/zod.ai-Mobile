@@ -7,19 +7,43 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState, useCallback } from "react";
-import { router, useFocusEffect } from "expo-router";
-import ProfileService, { UserProfile } from "../services/ProfileService";
-import AuthService from "../services/AuthService";
+import { useEffect, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { get } from "../utils/api";
 import { format, isValid } from "date-fns";
-import { LinearGradient } from "expo-linear-gradient";
-import { PurchaseBottomSheet } from "../components/PurchaseBottomSheet";
 import CreationDialog from "../components/CreationDialog";
 
-export default function ProfileScreen() {
+interface UserProfile {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    handle?: string;
+    profileUrl?: string;
+    createdAt: string;
+  };
+  creations: {
+    id: string;
+    displayImage: string;
+    createdAt: string;
+    image: {
+      id: string;
+      url: string;
+      isPremium: boolean;
+      prompt: string;
+    };
+    createdBy: {
+      id: string;
+      name: string;
+      profileUrl?: string;
+    };
+  }[];
+}
+
+export default function UserProfileScreen() {
+  const { userId } = useLocalSearchParams<{ userId: string }>();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showPurchaseSheet, setShowPurchaseSheet] = useState(false);
   const [selectedCreation, setSelectedCreation] = useState<{
     imageUrl: string;
     prompt: string;
@@ -31,30 +55,19 @@ export default function ProfileScreen() {
     };
   } | null>(null);
 
-  const fetchProfile = async () => {
+  useEffect(() => {
+    fetchUserProfile();
+  }, [userId]);
+
+  const fetchUserProfile = async () => {
     try {
       setLoading(true);
-      const data = await ProfileService.getProfile();
+      const data = await get<UserProfile>(`/api/auth/${userId}/profile`);
       setProfile(data);
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.error("Error fetching user profile:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchProfile();
-    }, [])
-  );
-
-  const handleLogout = async () => {
-    try {
-      await AuthService.logout();
-      router.replace("/login");
-    } catch (error) {
-      console.error("Error logging out:", error);
     }
   };
 
@@ -80,15 +93,13 @@ export default function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      {/* Logout Button */}
       <TouchableOpacity
-        className="absolute top-4 right-4 z-10"
-        onPress={handleLogout}
+        className="absolute top-4 left-4 z-10"
+        onPress={() => router.back()}
       >
-        <Ionicons name="log-out-outline" size={24} color="white" />
+        <Ionicons name="arrow-back" size={24} color="white" />
       </TouchableOpacity>
 
-      {/* Profile Header */}
       <View className="items-center pt-16 pb-8">
         <View className="w-24 h-24 rounded-full bg-gray-700 items-center justify-center overflow-hidden">
           {profile?.user.profileUrl ? (
@@ -107,49 +118,13 @@ export default function ProfileScreen() {
         <Text className="text-gray-500 text-xs mt-1">
           Joined {formatJoinDate(profile?.user.createdAt)}
         </Text>
-
-        {/* Token Chips */}
-        <View className="flex-row mt-4 space-x-2 gap-2">
-          <TouchableOpacity onPress={() => setShowPurchaseSheet(true)}>
-            <LinearGradient
-              colors={["rgba(59, 130, 246, 0.2)", "rgba(59, 130, 246, 0.1)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              className="px-4 py-2 rounded-full border border-blue-500/30 overflow-hidden"
-            >
-              <Text className="text-blue-400 text-sm">
-                {profile?.user.tokens || 0} Regular Tokens
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowPurchaseSheet(true)}>
-            <LinearGradient
-              colors={["rgba(234, 179, 8, 0.2)", "rgba(234, 179, 8, 0.1)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              className="px-4 py-2 rounded-full border border-yellow-800 overflow-hidden"
-            >
-              <Text className="text-yellow-600 text-sm">
-                {profile?.user.premiumTokens || 0} Premium Tokens
-              </Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          className="flex-row items-center mt-4 px-6 py-2 bg-white/10 rounded-full"
-          onPress={() => router.push("/update-profile")}
-        >
-          <Ionicons name="create-outline" size={16} color="white" />
-          <Text className="text-white ml-2">Edit Profile</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Creations Grid */}
       <View className="flex-1 px-4">
-        <Text className="text-white text-lg font-bold mb-4">My Creations</Text>
+        <Text className="text-white text-lg font-bold mb-4">Creations</Text>
         <FlatList
-          data={profile?.user?.creations}
+          data={profile?.creations}
           numColumns={2}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
@@ -160,11 +135,7 @@ export default function ProfileScreen() {
                   imageUrl: item.displayImage,
                   prompt: item.image.prompt,
                   isPremium: item.image.isPremium,
-                  user: {
-                    id: profile?.user.id || "",
-                    name: profile?.user.name || "",
-                    profileUrl: profile?.user.profileUrl,
-                  },
+                  user: item.createdBy,
                 });
               }}
             >
@@ -186,11 +157,6 @@ export default function ProfileScreen() {
           }
         />
       </View>
-
-      <PurchaseBottomSheet
-        visible={showPurchaseSheet}
-        onClose={() => setShowPurchaseSheet(false)}
-      />
 
       {selectedCreation && (
         <CreationDialog

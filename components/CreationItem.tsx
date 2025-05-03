@@ -1,3 +1,4 @@
+import React, { useMemo } from "react";
 import {
   View,
   Image,
@@ -9,140 +10,199 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useState, useRef } from "react";
 import { TapGestureHandler, State } from "react-native-gesture-handler";
+import LottieView from "lottie-react-native";
+import { GradientButton } from "./GradientButton";
+import CreationDialog from "./CreationDialog";
+import CommentsBottomSheet from "./CommentsBottomSheet";
+import ContentService from "../services/ContentService";
 
 interface CreationItemProps {
   imageUrl: string;
   onComment?: () => void;
   onShare?: () => void;
+  isPremium?: boolean;
+  prompt?: string;
+  liked?: boolean;
+  user?: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  };
+  creationId: string;
+  className?: string;
 }
 
-const CreationItem = ({ imageUrl, onComment, onShare }: CreationItemProps) => {
+const CreationItem = ({
+  imageUrl,
+  onComment,
+  onShare,
+  isPremium,
+  prompt,
+  user,
+  creationId,
+  liked,
+  className = "",
+}: CreationItemProps) => {
   const screenWidth = Dimensions.get("window").width;
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(liked);
+  const [showDialog, setShowDialog] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const doubleTapRef = useRef();
-  const scale = useRef(new Animated.Value(0)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const rotation = useRef(new Animated.Value(0)).current;
-  const [isAnimating, setIsAnimating] = useState(false);
+  const lottieRef = useRef<LottieView>(null);
+  const [showLottie, setShowLottie] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(true);
+  const snapPoints = useMemo(() => ["90%", "75%", "90%"], []);
+
+  const handleLike = async () => {
+    try {
+      setIsLiked(!isLiked);
+      if (!isLiked) {
+        setShowLottie(true);
+        lottieRef.current?.play();
+        setTimeout(() => {
+          setShowLottie(false);
+        }, 2000);
+      }
+      await ContentService.getInstance().likeCreation(creationId);
+    } catch (error) {
+      setIsLiked(liked);
+      console.error("Error liking creation:", error);
+    }
+  };
 
   const onDoubleTap = () => {
     if (!isLiked) {
-      setIsLiked(true);
+      handleLike();
     }
-
-    const randomRotation = Math.random() * 60 - 30;
-    rotation.setValue(randomRotation);
-
-    const targetScale = isAnimating ? 1.5 : 1;
-
-    scale.setValue(0);
-    opacity.setValue(0);
-    setIsAnimating(true);
-
-    Animated.parallel([
-      Animated.spring(scale, {
-        toValue: targetScale,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setTimeout(() => {
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          setIsAnimating(false);
-        });
-      }, 500);
-    });
   };
 
   return (
-    <View className="mb-4  rounded-[30px] overflow-hidden shadow-xl justify-center items-center flex shadow-black/50">
-      <TapGestureHandler
-        ref={doubleTapRef}
-        numberOfTaps={2}
-        onHandlerStateChange={({ nativeEvent }) => {
-          if (nativeEvent.state === State.ACTIVE) {
-            onDoubleTap();
-          }
+    <React.Fragment>
+      <TouchableOpacity
+        onPress={() => {
+          console.log("Opening dialog");
+          setShowDialog(true);
         }}
+        activeOpacity={0.7}
       >
-        <Animated.View>
-          <Image
-            source={{ uri: imageUrl }}
-            style={{ width: screenWidth - 40, height: screenWidth - 40 }}
-            className="rounded-[30px]"
-            resizeMode="cover"
-          />
-          <Animated.View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              justifyContent: "center",
-              alignItems: "center",
-              transform: [
-                { scale },
-                {
-                  rotate: rotation.interpolate({
-                    inputRange: [-30, 30],
-                    outputRange: ["-30deg", "30deg"],
-                  }),
-                },
-              ],
-              opacity,
+        <View
+          className={`mb-4 overflow-hidden justify-center items-center flex ${className}`}
+          style={{}}
+        >
+          <TapGestureHandler
+            ref={doubleTapRef}
+            numberOfTaps={2}
+            onHandlerStateChange={({ nativeEvent }) => {
+              if (nativeEvent.state === State.ACTIVE) {
+                onDoubleTap();
+              }
             }}
           >
-            <View
-              style={{
-                shadowColor: "#ff0000",
-                shadowOffset: {
-                  width: 0,
-                  height: 0,
-                },
-                shadowOpacity: 0.5,
-                shadowRadius: 10,
-                elevation: 5,
-              }}
-            >
-              <Ionicons name="heart" size={100} color="#ff0000" />
-            </View>
-          </Animated.View>
-        </Animated.View>
-      </TapGestureHandler>
-      <View className="absolute bottom-0 right-0 left-0 p-2">
-        <LinearGradient
-          colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.7)"]}
-          className="absolute inset-0 rounded-lg"
-        />
-        <View className="flex-row justify-between items-center space-x-2">
-          <TouchableOpacity className="ms-2">
-            <Ionicons
-              name={isLiked ? "heart" : "heart-outline"}
-              size={24}
-              color={isLiked ? "red" : "white"}
-              className="p-2"
+            <Animated.View>
+              <Image
+                source={{ uri: imageUrl }}
+                style={{ width: screenWidth - 40, height: screenWidth - 40 }}
+                resizeMode="cover"
+              />
+              {isPremium && (
+                <TouchableOpacity
+                  className="absolute top-3 left-3 z-10"
+                  onPress={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  <GradientButton
+                    text="Premium"
+                    onPress={() => {}}
+                    isSelected={true}
+                    className="py-0.5 px-2"
+                    tooltipMessage="This is a premium image. You can purchase it for 100 tokens."
+                    tooltipButtonName="Purchase"
+                    showTooltip={showTooltip}
+                    onTooltipButtonPress={() => {
+                      console.log("Purchase clicked");
+                    }}
+                  />
+                </TouchableOpacity>
+              )}
+              {showLottie && (
+                <View className="absolute inset-0 justify-center items-center">
+                  <LottieView
+                    ref={lottieRef}
+                    source={require("../assets/lottie/heart.json")}
+                    autoPlay={false}
+                    loop={false}
+                    style={{ width: 200, height: 200 }}
+                  />
+                </View>
+              )}
+            </Animated.View>
+          </TapGestureHandler>
+          <View className="absolute bottom-0 right-0 left-0 p-2">
+            <LinearGradient
+              colors={["rgba(0,0,0,0)", "rgba(0,0,0,0.7)"]}
+              className="absolute inset-0"
             />
-          </TouchableOpacity>
-          <View className="flex-row gap-1">
-            <TouchableOpacity onPress={onComment} className="p-2">
-              <Ionicons name="chatbubble-outline" size={24} color="white" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onShare} className="p-2">
-              <Ionicons name="share-outline" size={24} color="white" />
-            </TouchableOpacity>
+            <View className="flex-row justify-between items-center space-x-2">
+              <TouchableOpacity
+                className="ms-2"
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleLike();
+                }}
+              >
+                <Ionicons
+                  name={isLiked ? "heart" : "heart-outline"}
+                  size={24}
+                  color={isLiked ? "red" : "white"}
+                  className="p-2"
+                />
+              </TouchableOpacity>
+              <View className="flex-row gap-1">
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setShowComments(true);
+                  }}
+                  className="p-2"
+                >
+                  <Ionicons name="chatbubble-outline" size={24} color="white" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onShare?.();
+                  }}
+                  className="p-2"
+                >
+                  <Ionicons name="share-outline" size={24} color="white" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </View>
-      </View>
-    </View>
+      </TouchableOpacity>
+
+      <CreationDialog
+        visible={showDialog}
+        onClose={() => {
+          console.log("Closing dialog");
+          setShowDialog(false);
+        }}
+        imageUrl={imageUrl}
+        prompt={prompt || ""}
+        isPremium={isPremium || false}
+        user={user || { id: "", name: "", avatarUrl: "" }}
+      />
+      <CommentsBottomSheet
+        creationId={creationId}
+        isVisible={showComments}
+        snapPoints={snapPoints}
+        onClose={() => {
+          setShowComments(false);
+        }}
+      />
+    </React.Fragment>
   );
 };
 
